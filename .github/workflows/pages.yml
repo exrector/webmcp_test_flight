@@ -1,9 +1,11 @@
-name: Deploy FlightDeck to GitHub Pages
+name: Sync and deploy FlightDeck
 
 on:
   push:
     branches: ["main"]
   workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * *"
 
 permissions:
   contents: read
@@ -24,8 +26,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Sync real TestFlight catalog
+        run: node scripts/sync-testflight.mjs
+
       - name: Verify JavaScript
-        run: node --check app.js
+        run: |
+          node --check app.js
+          node --check scripts/sync-testflight.mjs
 
       - name: Verify catalog JSON
         run: python3 -m json.tool apps.json >/dev/null
