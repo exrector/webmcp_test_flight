@@ -24,6 +24,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Verify JavaScript
+        run: node --check app.js
+
+      - name: Verify catalog JSON
+        run: python3 -m json.tool apps.json >/dev/null
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
