@@ -1,0 +1,82 @@
+{
+  "apps": [
+    {
+      "id": "demo-arcade-01",
+      "name": "Neon Relay",
+      "developer": "Demo Studio",
+      "category": "Games",
+      "platforms": ["iOS", "iPadOS"],
+      "availability": "demo",
+      "description": "Fast arcade prototype used to demonstrate search, filtering, and agent discovery.",
+      "tags": ["arcade", "multiplayer", "controller"],
+      "testflightUrl": null,
+      "demo": true,
+      "updatedAt": "2026-08-27"
+    },
+    {
+      "id": "demo-productivity-01",
+      "name": "Focus Ledger",
+      "developer": "Demo Studio",
+      "category": "Productivity",
+      "platforms": ["iOS", "macOS"],
+      "availability": "demo",
+      "description": "A lightweight project tracker demonstrating a cross-platform beta listing.",
+      "tags": ["productivity", "projects", "sync"],
+      "testflightUrl": null,
+      "demo": true,
+      "updatedAt": "2026-08-27"
+    },
+    {
+      "id": "demo-photo-01",
+      "name": "Frame Lab",
+      "developer": "Demo Studio",
+      "category": "Photo & Video",
+      "platforms": ["iOS", "iPadOS"],
+      "availability": "demo",
+      "description": "Camera and image workflow placeholder for the prototype catalog.",
+      "tags": ["camera", "photo", "video"],
+      "testflightUrl": null,
+      "demo": true,
+      "updatedAt": "2026-08-27"
+    },
+    {
+      "id": "demo-utility-01",
+      "name": "Signal Desk",
+      "developer": "Demo Studio",
+      "category": "Utilities",
+      "platforms": ["macOS"],
+      "availability": "demo",
+      "description": "Desktop network utility placeholder that gives WebMCP agents another category to reason over.",
+      "tags": ["network", "diagnostics", "mac"],
+      "testflightUrl": null,
+      "demo": true,
+      "updatedAt": "2026-08-27"
+    },
+    {
+      "id": "demo-watch-01",
+      "name": "Pulse Notes",
+      "developer": "Demo Studio",
+      "category": "Lifestyle",
+      "platforms": ["iOS", "watchOS"],
+      "availability": "demo",
+      "description": "Companion app placeholder demonstrating platform-specific filtering.",
+      "tags": ["watch", "companion", "notes"],
+      "testflightUrl": null,
+      "demo": true,
+      "updatedAt": "2026-08-27"
+    },
+    {
+      "id": "demo-vision-01",
+      "name": "Spatial Board",
+      "developer": "Demo Studio",
+      "category": "Developer Tools",
+      "platforms": ["visionOS"],
+      "availability": "demo",
+      "description": "Spatial interface experiment included to exercise WebMCP platform discovery.",
+      "tags": ["spatial", "vision", "developer"],
+      "testflightUrl": null,
+      "demo": true,
+      "updatedAt": "2026-08-27"
+    }
+  ]
+}
