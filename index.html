@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="description" content="A WebMCP-enabled directory for discovering public TestFlight betas.">
+  <title>FlightDeck — TestFlight Discovery</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="FlightDeck home">
+      <span class="brand-mark" aria-hidden="true">✦</span>
+      <span>FlightDeck</span>
+    </a>
+    <div class="header-actions">
+      <span id="webmcpStatus" class="status-pill" title="WebMCP browser status">Checking WebMCP…</span>
+      <a class="ghost-button" href="https://github.com/exrector/webmcp_test_flight" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">TESTFLIGHT DISCOVERY · WEBMCP DEMO</p>
+      <h1>Find betas worth testing.</h1>
+      <p class="hero-copy">A lightweight catalog of public TestFlight apps that humans can browse and AI agents can query through structured WebMCP tools.</p>
+
+      <form id="searchForm" class="search-shell" role="search" toolname="search-testflight-catalog" tooldescription="Search and filter the visible TestFlight catalog">
+        <label class="sr-only" for="searchInput">Search betas</label>
+        <input id="searchInput" name="query" type="search" autocomplete="off" placeholder="Search apps, developers, tags…" toolparamdescription="Words to search for in app name, developer, description, or tags">
+        <button type="submit">Search</button>
+      </form>
+
+      <div class="filters" aria-label="Catalog filters">
+        <label>
+          <span>Category</span>
+          <select id="categoryFilter">
+            <option value="all">All categories</option>
+          </select>
+        </label>
+        <label>
+          <span>Availability</span>
+          <select id="availabilityFilter">
+            <option value="all">Any status</option>
+            <option value="open">Open</option>
+            <option value="limited">Limited</option>
+            <option value="closed">Closed</option>
+            <option value="demo">Demo</option>
+          </select>
+        </label>
+        <button id="resetFilters" class="secondary-button" type="button">Reset</button>
+      </div>
+    </section>
+
+    <section class="catalog-section" aria-labelledby="catalogTitle">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">CATALOG</p>
+          <h2 id="catalogTitle">Public betas</h2>
+        </div>
+        <p id="resultCount" class="result-count" aria-live="polite"></p>
+      </div>
+
+      <div id="catalog" class="catalog-grid" aria-live="polite"></div>
+
+      <div id="emptyState" class="empty-state" hidden>
+        <h3>No matching betas</h3>
+        <p>Change the filters or search terms.</p>
+      </div>
+    </section>
+
+    <section class="agent-section" aria-labelledby="agentTitle">
+      <div>
+        <p class="eyebrow">FOR AI AGENTS</p>
+        <h2 id="agentTitle">Structured actions, not screen scraping.</h2>
+      </div>
+      <div class="tool-list">
+        <code>search_testflight_apps</code>
+        <code>get_testflight_app</code>
+        <code>list_testflight_categories</code>
+        <code>get_catalog_stats</code>
+        <code>filter_visible_catalog</code>
+        <code>prepare_testflight_join</code>
+      </div>
+      <p class="agent-copy">In a WebMCP-capable browser, these tools are registered from the page with <code>document.modelContext.registerTool()</code>. In other browsers the site still works normally.</p>
+    </section>
+  </main>
+
+  <template id="appCardTemplate">
+    <article class="app-card">
+      <div class="card-topline">
+        <span class="category-badge"></span>
+        <span class="availability-badge"></span>
+      </div>
+      <div>
+        <h3 class="app-name"></h3>
+        <p class="developer"></p>
+      </div>
+      <p class="description"></p>
+      <div class="tags"></div>
+      <div class="card-footer">
+        <span class="platforms"></span>
+        <a class="join-link" target="_blank" rel="noreferrer">Open TestFlight</a>
+      </div>
+    </article>
+  </template>
+
+  <footer>
+    <p>FlightDeck is an independent demo and is not affiliated with Apple. TestFlight is a trademark of Apple Inc.</p>
+  </footer>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
