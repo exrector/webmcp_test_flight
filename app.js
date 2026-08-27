@@ -1,9 +1,19 @@
+const STATUS_LABELS = {
+  open: "Accepting testers",
+  full: "Full",
+  closed: "Not accepting",
+  removed: "Removed"
+};
+
+const STATUS_ORDER = { open: 0, full: 1, closed: 2, removed: 3 };
+
 const state = {
   apps: [],
   filtered: [],
+  meta: {},
   query: "",
-  category: "all",
-  availability: "all",
+  platform: "all",
+  availability: "all"
 };
 
 const els = {
@@ -11,60 +21,57 @@ const els = {
   template: document.querySelector("#appCardTemplate"),
   searchForm: document.querySelector("#searchForm"),
   searchInput: document.querySelector("#searchInput"),
-  categoryFilter: document.querySelector("#categoryFilter"),
+  platformFilter: document.querySelector("#platformFilter"),
   availabilityFilter: document.querySelector("#availabilityFilter"),
   resetFilters: document.querySelector("#resetFilters"),
   resultCount: document.querySelector("#resultCount"),
+  liveStats: document.querySelector("#liveStats"),
   emptyState: document.querySelector("#emptyState"),
-  webmcpStatus: document.querySelector("#webmcpStatus"),
+  webmcpStatus: document.querySelector("#webmcpStatus")
 };
 
 const normalize = value => String(value ?? "").trim().toLowerCase();
 
-function searchableText(app) {
-  return [
-    app.name,
-    app.developer,
-    app.category,
-    app.description,
-    ...(app.platforms || []),
-    ...(app.tags || []),
-  ].map(normalize).join(" ");
+function sortApps(apps) {
+  return [...apps].sort((a, b) => {
+    const status = (STATUS_ORDER[a.availability] ?? 99) - (STATUS_ORDER[b.availability] ?? 99);
+    if (status) return status;
+    const date = String(b.lastModified || "").localeCompare(String(a.lastModified || ""));
+    if (date) return date;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
 }
 
-function filterApps({ query = "", category = "all", availability = "all", platform = "all" } = {}) {
+function filterApps({ query = "", platform = "all", availability = "all" } = {}) {
   const q = normalize(query);
-  const categoryValue = normalize(category);
-  const availabilityValue = normalize(availability);
-  const platformValue = normalize(platform);
-
-  return state.apps.filter(app => {
-    const matchesQuery = !q || searchableText(app).includes(q);
-    const matchesCategory = categoryValue === "all" || normalize(app.category) === categoryValue;
-    const matchesAvailability = availabilityValue === "all" || normalize(app.availability) === availabilityValue;
-    const matchesPlatform = platformValue === "all" || (app.platforms || []).some(item => normalize(item) === platformValue);
-    return matchesQuery && matchesCategory && matchesAvailability && matchesPlatform;
-  });
+  return sortApps(state.apps.filter(app => {
+    const matchesQuery = !q || normalize(app.name).includes(q) || normalize(app.id).includes(q);
+    const matchesPlatform = platform === "all" || (app.platforms || []).includes(platform);
+    const matchesAvailability = availability === "all" || app.availability === availability;
+    return matchesQuery && matchesPlatform && matchesAvailability;
+  }));
 }
 
 function syncUrl() {
   const params = new URLSearchParams();
   if (state.query) params.set("q", state.query);
-  if (state.category !== "all") params.set("category", state.category);
+  if (state.platform !== "all") params.set("platform", state.platform);
   if (state.availability !== "all") params.set("availability", state.availability);
-  const next = params.size ? `?${params.toString()}` : location.pathname;
-  history.replaceState(null, "", next);
+  history.replaceState(null, "", params.size ? `?${params}` : location.pathname);
 }
 
 function applyFilters({ updateUrl = true } = {}) {
-  state.filtered = filterApps({
-    query: state.query,
-    category: state.category,
-    availability: state.availability,
-  });
+  state.filtered = filterApps(state);
   renderCatalog();
   if (updateUrl) syncUrl();
   return state.filtered;
+}
+
+function platformBadge(name) {
+  const span = document.createElement("span");
+  span.className = "platform-badge";
+  span.textContent = name;
+  return span;
 }
 
 function renderCatalog() {
@@ -74,66 +81,59 @@ function renderCatalog() {
     const card = els.template.content.firstElementChild.cloneNode(true);
     card.dataset.appId = app.id;
 
-    card.querySelector(".category-badge").textContent = app.category;
+    const platformWrap = card.querySelector(".platform-badges");
+    for (const platform of app.platforms || []) platformWrap.append(platformBadge(platform));
+
     const availability = card.querySelector(".availability-badge");
-    availability.textContent = app.availability;
-    availability.classList.add(normalize(app.availability));
+    availability.textContent = STATUS_LABELS[app.availability] || app.availability;
+    availability.classList.add(app.availability);
 
     card.querySelector(".app-name").textContent = app.name;
-    card.querySelector(".developer").textContent = app.developer;
-    card.querySelector(".description").textContent = app.description;
-    card.querySelector(".platforms").textContent = (app.platforms || []).join(" · ");
-
-    const tags = card.querySelector(".tags");
-    for (const item of app.tags || []) {
-      const tag = document.createElement("span");
-      tag.className = "tag";
-      tag.textContent = item;
-      tags.append(tag);
-    }
+    card.querySelector(".updated").textContent = app.lastModified ? `Status checked ${app.lastModified}` : "Status date unavailable";
+    card.querySelector(".testflight-id").textContent = `ID ${app.id}`;
 
     const link = card.querySelector(".join-link");
-    if (app.testflightUrl) {
-      link.href = app.testflightUrl;
-      link.setAttribute("aria-label", `Open ${app.name} in TestFlight`);
-    } else {
+    if (app.availability === "removed") {
       link.removeAttribute("href");
-      link.textContent = "Demo entry";
+      link.textContent = "Removed";
       link.classList.add("disabled");
       link.setAttribute("aria-disabled", "true");
+    } else {
+      link.href = app.testflightUrl;
+      link.setAttribute("aria-label", `Open ${app.name} in TestFlight`);
     }
 
     els.catalog.append(card);
   }
 
-  const count = state.filtered.length;
-  els.resultCount.textContent = `${count} ${count === 1 ? "beta" : "betas"}`;
-  els.emptyState.hidden = count !== 0;
+  els.resultCount.textContent = `${state.filtered.length.toLocaleString()} of ${state.apps.length.toLocaleString()}`;
+  els.emptyState.hidden = state.filtered.length !== 0;
 }
 
-function populateCategories() {
-  const categories = [...new Set(state.apps.map(app => app.category))].sort((a, b) => a.localeCompare(b));
-  for (const category of categories) {
-    const option = document.createElement("option");
-    option.value = category;
-    option.textContent = category;
-    els.categoryFilter.append(option);
-  }
+function renderStats() {
+  const open = state.apps.filter(app => app.availability === "open").length;
+  const full = state.apps.filter(app => app.availability === "full").length;
+  const synced = state.meta.generatedAt ? new Date(state.meta.generatedAt).toLocaleString() : "unknown";
+  els.liveStats.innerHTML = `
+    <span><strong>${state.apps.length.toLocaleString()}</strong> tracked</span>
+    <span><strong>${open.toLocaleString()}</strong> accepting testers</span>
+    <span><strong>${full.toLocaleString()}</strong> full</span>
+    <span class="sync-time">Synced ${synced}</span>
+  `;
 }
 
 function readUrlState() {
   const params = new URLSearchParams(location.search);
   state.query = params.get("q") || "";
-  state.category = params.get("category") || "all";
+  state.platform = params.get("platform") || "all";
   state.availability = params.get("availability") || "all";
-
   els.searchInput.value = state.query;
-  els.categoryFilter.value = state.category;
+  els.platformFilter.value = state.platform;
   els.availabilityFilter.value = state.availability;
 }
 
 function highlightApp(id) {
-  document.querySelectorAll(".app-card.agent-focus").forEach(card => card.classList.remove("agent-focus"));
+  document.querySelectorAll(".agent-focus").forEach(card => card.classList.remove("agent-focus"));
   const card = document.querySelector(`[data-app-id="${CSS.escape(id)}"]`);
   if (!card) return false;
   card.classList.add("agent-focus");
@@ -145,15 +145,12 @@ function toolResult(app) {
   return {
     id: app.id,
     name: app.name,
-    developer: app.developer,
-    category: app.category,
     platforms: app.platforms,
     availability: app.availability,
-    description: app.description,
-    tags: app.tags,
-    testflightUrl: app.testflightUrl || null,
-    demo: Boolean(app.demo),
-    updatedAt: app.updatedAt,
+    availabilityLabel: STATUS_LABELS[app.availability] || app.availability,
+    lastModified: app.lastModified,
+    testflightUrl: app.testflightUrl,
+    source: state.meta.source || null
   };
 }
 
@@ -171,19 +168,18 @@ async function registerWebMCPTools() {
   const tools = [
     {
       name: "search_testflight_apps",
-      description: "Search the TestFlight catalog by text, category, availability, or Apple platform without changing the visible page.",
+      description: "Search real public TestFlight programs by app name, platform, and current availability.",
       inputSchema: {
         type: "object",
         properties: {
-          query: { type: "string", description: "Search words for app name, developer, description, tags, or platform." },
-          category: { type: "string", description: "Exact category name, or all." },
-          availability: { type: "string", enum: ["all", "open", "limited", "closed", "demo"], description: "Beta availability." },
-          platform: { type: "string", description: "Apple platform such as iOS, iPadOS, macOS, tvOS, watchOS, or visionOS." },
-          limit: { type: "integer", minimum: 1, maximum: 50, description: "Maximum number of results." }
+          query: { type: "string", description: "App name or TestFlight ID." },
+          platform: { type: "string", enum: ["all", "iOS", "iPadOS", "macOS", "tvOS", "visionOS"] },
+          availability: { type: "string", enum: ["all", "open", "full", "closed", "removed"] },
+          limit: { type: "integer", minimum: 1, maximum: 100 }
         }
       },
       execute(input = {}) {
-        const limit = Math.min(Math.max(Number(input.limit) || 20, 1), 50);
+        const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 100);
         const results = filterApps(input).slice(0, limit).map(toolResult);
         return { count: results.length, results };
       },
@@ -191,120 +187,101 @@ async function registerWebMCPTools() {
     },
     {
       name: "get_testflight_app",
-      description: "Get complete catalog information for one beta by its stable catalog id.",
+      description: "Get one real TestFlight program by its join ID.",
       inputSchema: {
         type: "object",
-        properties: { id: { type: "string", description: "Stable app id from search_testflight_apps." } },
+        properties: { id: { type: "string" } },
         required: ["id"]
       },
       execute({ id }) {
         const app = state.apps.find(item => item.id === id);
-        if (!app) return { found: false, error: `No app with id "${id}".` };
-        return { found: true, app: toolResult(app) };
+        return app ? { found: true, app: toolResult(app) } : { found: false };
       },
       annotations: { readOnlyHint: true }
     },
     {
-      name: "list_testflight_categories",
-      description: "List available categories in the current TestFlight catalog.",
+      name: "list_testflight_platforms",
+      description: "List supported Apple platforms and counts in the live catalog.",
       inputSchema: { type: "object", properties: {} },
       execute() {
-        const categories = [...new Set(state.apps.map(app => app.category))].sort();
-        return { categories };
+        const counts = {};
+        for (const app of state.apps) for (const p of app.platforms || []) counts[p] = (counts[p] || 0) + 1;
+        return { platforms: counts };
       },
       annotations: { readOnlyHint: true }
     },
     {
       name: "get_catalog_stats",
-      description: "Return summary counts for the TestFlight catalog.",
+      description: "Return live TestFlight catalog counts by availability and platform.",
       inputSchema: { type: "object", properties: {} },
       execute() {
         const byAvailability = {};
         const byPlatform = {};
         for (const app of state.apps) {
           byAvailability[app.availability] = (byAvailability[app.availability] || 0) + 1;
-          for (const platform of app.platforms || []) {
-            byPlatform[platform] = (byPlatform[platform] || 0) + 1;
-          }
+          for (const p of app.platforms || []) byPlatform[p] = (byPlatform[p] || 0) + 1;
         }
-        return {
-          total: state.apps.length,
-          byAvailability,
-          byPlatform,
-          demoEntries: state.apps.filter(app => app.demo).length
-        };
+        return { total: state.apps.length, byAvailability, byPlatform, generatedAt: state.meta.generatedAt, source: state.meta.source };
       },
       annotations: { readOnlyHint: true }
     },
     {
       name: "filter_visible_catalog",
-      description: "Apply search and filter values to the visible catalog UI so the user sees the same results as the agent.",
+      description: "Apply filters to the page so the user sees the same real TestFlight results as the agent.",
       inputSchema: {
         type: "object",
         properties: {
-          query: { type: "string", description: "Search words. Empty string clears text search." },
-          category: { type: "string", description: "Exact category name, or all." },
-          availability: { type: "string", enum: ["all", "open", "limited", "closed", "demo"] }
+          query: { type: "string" },
+          platform: { type: "string", enum: ["all", "iOS", "iPadOS", "macOS", "tvOS", "visionOS"] },
+          availability: { type: "string", enum: ["all", "open", "full", "closed", "removed"] }
         }
       },
       execute(input = {}) {
         if (typeof input.query === "string") state.query = input.query;
-        if (typeof input.category === "string") state.category = input.category;
+        if (typeof input.platform === "string") state.platform = input.platform;
         if (typeof input.availability === "string") state.availability = input.availability;
-
         els.searchInput.value = state.query;
-        els.categoryFilter.value = state.category;
+        els.platformFilter.value = state.platform;
         els.availabilityFilter.value = state.availability;
-
         const results = applyFilters();
-        return {
-          visibleCount: results.length,
-          filters: { query: state.query, category: state.category, availability: state.availability }
-        };
+        return { visibleCount: results.length, filters: { query: state.query, platform: state.platform, availability: state.availability } };
       }
     },
     {
       name: "prepare_testflight_join",
-      description: "Bring one beta into view and return its TestFlight URL. The user remains in control of opening the external TestFlight page.",
+      description: "Bring a real TestFlight program into view and return its Apple TestFlight join URL for the user to open.",
       inputSchema: {
         type: "object",
-        properties: { id: { type: "string", description: "Stable app id from search_testflight_apps." } },
+        properties: { id: { type: "string" } },
         required: ["id"]
       },
       execute({ id }) {
         const app = state.apps.find(item => item.id === id);
-        if (!app) return { prepared: false, error: `No app with id "${id}".` };
-
+        if (!app) return { prepared: false, error: "App not found" };
         state.query = app.name;
-        state.category = "all";
+        state.platform = "all";
         state.availability = "all";
         els.searchInput.value = state.query;
-        els.categoryFilter.value = "all";
+        els.platformFilter.value = "all";
         els.availabilityFilter.value = "all";
         applyFilters();
-
-        const highlighted = highlightApp(id);
         return {
-          prepared: highlighted,
-          id,
-          name: app.name,
-          testflightUrl: app.testflightUrl || null,
+          prepared: highlightApp(id),
+          app: toolResult(app),
           requiresUserOpen: true,
-          demo: Boolean(app.demo)
+          joinable: app.availability !== "removed"
         };
       }
     }
   ];
 
   try {
-    for (const tool of tools) {
-      await modelContext.registerTool(tool, { signal });
-    }
+    for (const tool of tools) await modelContext.registerTool(tool, { signal });
     els.webmcpStatus.textContent = `WebMCP ready · ${tools.length} tools`;
     els.webmcpStatus.classList.add("supported");
     window.addEventListener("pagehide", () => controller.abort(), { once: true });
   } catch (error) {
-    console.error("WebMCP registration failed", error);
+    console.error(error);
     els.webmcpStatus.textContent = "WebMCP registration error";
     els.webmcpStatus.classList.add("unsupported");
   }
@@ -314,11 +291,10 @@ async function loadCatalog() {
   const response = await fetch("./apps.json", { cache: "no-store" });
   if (!response.ok) throw new Error(`Unable to load apps.json: ${response.status}`);
   const payload = await response.json();
-  state.apps = Array.isArray(payload) ? payload : payload.apps;
-  if (!Array.isArray(state.apps)) throw new Error("apps.json must contain an array or an { apps: [] } object.");
-
-  populateCategories();
+  state.apps = Array.isArray(payload.apps) ? payload.apps : [];
+  state.meta = payload.meta || {};
   readUrlState();
+  renderStats();
   applyFilters({ updateUrl: false });
   await registerWebMCPTools();
 }
@@ -334,8 +310,8 @@ els.searchInput.addEventListener("input", () => {
   applyFilters();
 });
 
-els.categoryFilter.addEventListener("change", () => {
-  state.category = els.categoryFilter.value;
+els.platformFilter.addEventListener("change", () => {
+  state.platform = els.platformFilter.value;
   applyFilters();
 });
 
@@ -346,10 +322,10 @@ els.availabilityFilter.addEventListener("change", () => {
 
 els.resetFilters.addEventListener("click", () => {
   state.query = "";
-  state.category = "all";
+  state.platform = "all";
   state.availability = "all";
   els.searchInput.value = "";
-  els.categoryFilter.value = "all";
+  els.platformFilter.value = "all";
   els.availabilityFilter.value = "all";
   applyFilters();
 });
