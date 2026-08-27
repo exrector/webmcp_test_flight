@@ -50,12 +50,33 @@ The page registers six tools when WebMCP is available:
 - `filter_visible_catalog`
 - `prepare_testflight_join`
 
+These are the only WebMCP tools exposed by the page. The search form is ordinary
+HTML UI and does not register an additional declarative tool.
+
+Every tool validates its arguments before reading or changing page state.
+Unknown arguments, unsupported `platform` or `availability` values, non-integer
+or out-of-range `limit` values (valid range: `1..100`), missing or empty required
+`id` values, and other incorrect argument types return a structured error:
+
+```json
+{
+  "error": {
+    "code": "INVALID_ARGUMENT",
+    "message": "A clear description of the invalid argument."
+  }
+}
+```
+
+Invalid calls to `filter_visible_catalog` and `prepare_testflight_join` do not
+change the visible filters or catalog state.
+
 The site remains a normal searchable website in browsers without WebMCP.
 
 ## Local development
 
 ```bash
 node scripts/sync-testflight.mjs
+node scripts/test-webmcp.mjs
 python3 -m http.server 8080
 ```
 

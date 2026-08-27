@@ -6,6 +6,8 @@ const STATUS_LABELS = {
 };
 
 const STATUS_ORDER = { open: 0, full: 1, closed: 2, removed: 3 };
+const PLATFORMS = ["all", "iOS", "iPadOS", "macOS", "tvOS", "visionOS"];
+const AVAILABILITIES = ["all", "open", "full", "closed", "removed"];
 
 const state = {
   apps: [],
@@ -154,6 +156,50 @@ function toolResult(app) {
   };
 }
 
+function invalidArgument(message) {
+  return { error: { code: "INVALID_ARGUMENT", message } };
+}
+
+function validateToolInput(input, fields = {}) {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    return invalidArgument("Arguments must be an object.");
+  }
+
+  const allowed = new Set(Object.keys(fields));
+  const unknown = Object.keys(input).filter(key => !allowed.has(key));
+  if (unknown.length) {
+    return invalidArgument(`Unknown argument${unknown.length === 1 ? "" : "s"}: ${unknown.join(", ")}.`);
+  }
+
+  for (const [name, rules] of Object.entries(fields)) {
+    const present = Object.prototype.hasOwnProperty.call(input, name);
+    if (rules.required && !present) return invalidArgument(`Missing required argument: ${name}.`);
+    if (!present) continue;
+
+    const value = input[name];
+    if (rules.type === "string" && typeof value !== "string") {
+      return invalidArgument(`${name} must be a string.`);
+    }
+    if (rules.type === "integer" && !Number.isInteger(value)) {
+      return invalidArgument(`${name} must be an integer.`);
+    }
+    if (rules.nonEmpty && !value.trim()) {
+      return invalidArgument(`${name} must be a non-empty string.`);
+    }
+    if (rules.enum && !rules.enum.includes(value)) {
+      return invalidArgument(`${name} must be one of: ${rules.enum.join(", ")}.`);
+    }
+    if (rules.minimum !== undefined && value < rules.minimum) {
+      return invalidArgument(`${name} must be at least ${rules.minimum}.`);
+    }
+    if (rules.maximum !== undefined && value > rules.maximum) {
+      return invalidArgument(`${name} must be at most ${rules.maximum}.`);
+    }
+  }
+
+  return null;
+}
+
 async function registerWebMCPTools() {
   const modelContext = document.modelContext || navigator.modelContext;
   if (!modelContext || typeof modelContext.registerTool !== "function") {
@@ -171,6 +217,7 @@ async function registerWebMCPTools() {
       description: "Search real public TestFlight programs by app name, platform, and current availability.",
       inputSchema: {
         type: "object",
+        additionalProperties: false,
         properties: {
           query: { type: "string", description: "App name or TestFlight ID." },
           platform: { type: "string", enum: ["all", "iOS", "iPadOS", "macOS", "tvOS", "visionOS"] },
@@ -179,7 +226,14 @@ async function registerWebMCPTools() {
         }
       },
       execute(input = {}) {
-        const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 100);
+        const validationError = validateToolInput(input, {
+          query: { type: "string" },
+          platform: { type: "string", enum: PLATFORMS },
+          availability: { type: "string", enum: AVAILABILITIES },
+          limit: { type: "integer", minimum: 1, maximum: 100 }
+        });
+        if (validationError) return validationError;
+        const limit = input.limit ?? 25;
         const results = filterApps(input).slice(0, limit).map(toolResult);
         return { count: results.length, results };
       },
@@ -190,10 +244,16 @@ async function registerWebMCPTools() {
       description: "Get one real TestFlight program by its join ID.",
       inputSchema: {
         type: "object",
-        properties: { id: { type: "string" } },
+        additionalProperties: false,
+        properties: { id: { type: "string", minLength: 1 } },
         required: ["id"]
       },
-      execute({ id }) {
+      execute(input = {}) {
+        const validationError = validateToolInput(input, {
+          id: { type: "string", required: true, nonEmpty: true }
+        });
+        if (validationError) return validationError;
+        const { id } = input;
         const app = state.apps.find(item => item.id === id);
         return app ? { found: true, app: toolResult(app) } : { found: false };
       },
@@ -202,8 +262,10 @@ async function registerWebMCPTools() {
     {
       name: "list_testflight_platforms",
       description: "List supported Apple platforms and counts in the live catalog.",
-      inputSchema: { type: "object", properties: {} },
-      execute() {
+      inputSchema: { type: "object", additionalProperties: false, properties: {} },
+      execute(input = {}) {
+        const validationError = validateToolInput(input);
+        if (validationError) return validationError;
         const counts = {};
         for (const app of state.apps) for (const p of app.platforms || []) counts[p] = (counts[p] || 0) + 1;
         return { platforms: counts };
@@ -213,8 +275,10 @@ async function registerWebMCPTools() {
     {
       name: "get_catalog_stats",
       description: "Return live TestFlight catalog counts by availability and platform.",
-      inputSchema: { type: "object", properties: {} },
-      execute() {
+      inputSchema: { type: "object", additionalProperties: false, properties: {} },
+      execute(input = {}) {
+        const validationError = validateToolInput(input);
+        if (validationError) return validationError;
         const byAvailability = {};
         const byPlatform = {};
         for (const app of state.apps) {
@@ -230,6 +294,7 @@ async function registerWebMCPTools() {
       description: "Apply filters to the page so the user sees the same real TestFlight results as the agent.",
       inputSchema: {
         type: "object",
+        additionalProperties: false,
         properties: {
           query: { type: "string" },
           platform: { type: "string", enum: ["all", "iOS", "iPadOS", "macOS", "tvOS", "visionOS"] },
@@ -237,9 +302,15 @@ async function registerWebMCPTools() {
         }
       },
       execute(input = {}) {
-        if (typeof input.query === "string") state.query = input.query;
-        if (typeof input.platform === "string") state.platform = input.platform;
-        if (typeof input.availability === "string") state.availability = input.availability;
+        const validationError = validateToolInput(input, {
+          query: { type: "string" },
+          platform: { type: "string", enum: PLATFORMS },
+          availability: { type: "string", enum: AVAILABILITIES }
+        });
+        if (validationError) return validationError;
+        if (Object.prototype.hasOwnProperty.call(input, "query")) state.query = input.query;
+        if (Object.prototype.hasOwnProperty.call(input, "platform")) state.platform = input.platform;
+        if (Object.prototype.hasOwnProperty.call(input, "availability")) state.availability = input.availability;
         els.searchInput.value = state.query;
         els.platformFilter.value = state.platform;
         els.availabilityFilter.value = state.availability;
@@ -252,10 +323,16 @@ async function registerWebMCPTools() {
       description: "Bring a real TestFlight program into view and return its Apple TestFlight join URL for the user to open.",
       inputSchema: {
         type: "object",
-        properties: { id: { type: "string" } },
+        additionalProperties: false,
+        properties: { id: { type: "string", minLength: 1 } },
         required: ["id"]
       },
-      execute({ id }) {
+      execute(input = {}) {
+        const validationError = validateToolInput(input, {
+          id: { type: "string", required: true, nonEmpty: true }
+        });
+        if (validationError) return validationError;
+        const { id } = input;
         const app = state.apps.find(item => item.id === id);
         if (!app) return { prepared: false, error: "App not found" };
         state.query = app.name;

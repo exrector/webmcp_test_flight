@@ -33,6 +33,7 @@ jobs:
         run: |
           node --check app.js
           node --check scripts/sync-testflight.mjs
+          node scripts/test-webmcp.mjs
 
       - name: Verify catalog JSON
         run: python3 -m json.tool apps.json >/dev/null
