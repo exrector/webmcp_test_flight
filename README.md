@@ -50,6 +50,30 @@ The page registers six tools when WebMCP is available:
 - `filter_visible_catalog`
 - `prepare_testflight_join`
 
+FlightDeck uses imperative WebMCP tool registration. A representative tool follows the canonical WebMCP form:
+
+```js
+document.modelContext.registerTool({
+  name: "search_testflight_apps",
+  description: "Search real public TestFlight programs by app name, platform, and current availability.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      query: { type: "string" },
+      platform: { type: "string" },
+      availability: { type: "string" },
+      limit: { type: "integer", minimum: 1, maximum: 100 }
+    }
+  },
+  execute: async (input) => {
+    // FlightDeck validates input and returns structured catalog results.
+  }
+});
+```
+
+The production implementation in `app.js` uses the same `registerTool()` API through the detected WebMCP model context and registers all six tools with explicit schemas, validation, and execution handlers.
+
 These are the only WebMCP tools exposed by the page. The search form is ordinary
 HTML UI and does not register an additional declarative tool.
 
